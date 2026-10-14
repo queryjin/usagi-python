@@ -3,18 +3,22 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 import sys
 import unicodedata
 
 from . import __version__
+from .art import ART_WIDTH, USAGI_ART
 from .core import Usagi, translate
 from .vocab import VOCAB
 
-BANNER = r"""
+TITLE = "우사기와 대화하기  (/help 도움말, /quit 종료)"
+
+SMALL_BANNER = r"""
    (\(\
-   ( -.-)   우사기와 대화하기  (/help 도움말, /quit 종료)
+   ( -.-)   {title}
    o_(")(")
-"""
+""".format(title=TITLE)
 
 HELP = """\
 /help       도움말
@@ -34,8 +38,15 @@ def format_dict() -> str:
     )
 
 
-def chat(usagi: Usagi, explain: bool) -> int:
-    print(BANNER)
+def banner(show_art: bool = True) -> str:
+    """시작 화면. 터미널이 아트보다 좁으면 작은 배너로 대신한다."""
+    if show_art and shutil.get_terminal_size().columns >= ART_WIDTH:
+        return f"{USAGI_ART}\n   {TITLE}\n"
+    return SMALL_BANNER
+
+
+def chat(usagi: Usagi, explain: bool, show_art: bool = True) -> int:
+    print(banner(show_art))
     print(f"우사기> {usagi.greet().render(explain)}")
     while True:
         try:
@@ -66,12 +77,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("-V", "--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("-e", "--explain", action="store_true", help="대답 옆에 번역 표시")
     parser.add_argument("--seed", type=int, help="랜덤 시드 (재현용)")
+    parser.add_argument("--no-art", action="store_true", help="시작할 때 우사기 아트 숨기기")
     sub = parser.add_subparsers(dest="command")
     say_p = sub.add_parser("say", help="한 문장에 대한 대답만 출력")
     say_p.add_argument("message", nargs="+")
     tr_p = sub.add_parser("translate", help="우사기 말을 번역")
     tr_p.add_argument("word")
     sub.add_parser("dict", help="우사기 사전 출력")
+    sub.add_parser("art", help="우사기 아트 출력")
     return parser
 
 
@@ -87,9 +100,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "dict":
         print(format_dict())
         return 0
+    if args.command == "art":
+        print(USAGI_ART)
+        return 0
     if not sys.stdin.isatty():
         for line in sys.stdin:
             if line.strip():
                 print(usagi.reply(line.strip()).render(args.explain))
         return 0
-    return chat(usagi, args.explain)
+    return chat(usagi, args.explain, show_art=not args.no_art)

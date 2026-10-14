@@ -67,3 +67,22 @@ def test_cli_dict(capsys):
     main(["dict"])
     out = capsys.readouterr().out
     assert all(word in out for word in VOCAB)
+
+
+def test_cli_art(capsys):
+    from usagi.art import USAGI_ART
+
+    main(["art"])
+    assert USAGI_ART in capsys.readouterr().out
+
+
+def test_banner_falls_back_on_narrow_terminal(monkeypatch):
+    import os
+
+    from usagi import cli
+
+    monkeypatch.setattr(cli.shutil, "get_terminal_size", lambda: os.terminal_size((40, 20)))
+    assert cli.banner() == cli.SMALL_BANNER
+    monkeypatch.setattr(cli.shutil, "get_terminal_size", lambda: os.terminal_size((120, 40)))
+    assert cli.USAGI_ART in cli.banner()
+    assert cli.banner(show_art=False) == cli.SMALL_BANNER

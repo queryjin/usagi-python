@@ -33,6 +33,8 @@ pip install -e ".[dev]"
 ```bash
 usagi                 # 대화 모드
 usagi -e              # 대답 옆에 번역 표시 (대화 중 /explain 으로 토글)
+usagi --no-art        # 시작 화면의 우사기 아트 숨기기
+usagi art             # 우사기 아트만 출력
 usagi say 배고파       # 한 문장만 대답
 usagi translate 우라   # 우사기 말 번역 -> 최근 / 거대하다
 usagi dict            # 사전 보기
@@ -41,6 +43,9 @@ python -m usagi       # 설치 없이 실행 (src 를 PYTHONPATH 에 둘 때)
 ```
 
 대화 모드 명령어: `/help`, `/dict`, `/explain`, `/quit`
+
+대화 모드를 시작하면 우사기 점자 아트(`src/usagi/art.py`)가 먼저 나옵니다.
+아트 폭은 74칸이라, 터미널이 그보다 좁으면 작은 토끼 배너로 대신합니다.
 
 ## 파이썬에서 사용
 
