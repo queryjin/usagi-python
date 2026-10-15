@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "usagi-python"
-version = "0.1.0"
-description = "치이카와의 우사기처럼 대답하는 터미널 대화 라이브러리"
+version = "0.2.0"
+description = "치이카와 캐릭터(우사기, 치이카와, 하치와레)처럼 대답하는 터미널 대화 라이브러리"
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
@@ -16,6 +16,8 @@ dev = ["pytest>=7"]
 
 [project.scripts]
 usagi = "usagi.cli:main"
+chii = "usagi.cli:chii_main"
+hachi = "usagi.cli:hachi_main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

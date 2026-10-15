@@ -1,111 +1,131 @@
-"""터미널에서 우사기와 대화하는 CLI."""
+"""터미널에서 캐릭터와 대화하는 CLI. `usagi`, `chii`, `hachi` 명령이 모두 여기로 온다."""
 
 from __future__ import annotations
 
 import argparse
 import shutil
 import sys
-import unicodedata
 
 from . import __version__
-from .art import ART_WIDTH, USAGI_ART
-from .core import Usagi, translate
-from .vocab import VOCAB
-
-TITLE = "우사기와 대화하기  (/help 도움말, /quit 종료)"
-
-SMALL_BANNER = r"""
-   (\(\
-   ( -.-)   {title}
-   o_(")(")
-""".format(title=TITLE)
+from .characters import CHARACTERS, get_character
+from .core import Character, Chatter, display_width
 
 HELP = """\
-/help       도움말
-/dict       우사기 사전 보기
-/explain    번역 표시 켜기/끄기
-/quit       종료 (Ctrl+D 도 가능)"""
+/help         도움말
+/dict         지금 캐릭터의 사전 보기
+/explain      번역 표시 켜기/끄기
+/char <이름>  캐릭터 바꾸기 ({names})
+/quit         종료 (Ctrl+D 도 가능)""".format(names=", ".join(CHARACTERS))
 
 
-def _display_width(text: str) -> int:
-    return sum(2 if unicodedata.east_asian_width(c) in "WF" else 1 for c in text)
+def format_dict(character: Character) -> str:
+    width = max(display_width(w) for w in character.vocab) + 2
+    lines = [
+        f"  {e.word}{' ' * (width - display_width(e.word))}{e.situation}"
+        for e in character.expressions
+    ]
+    if character.profile:
+        lines = [f"  {line}" for line in character.profile] + [""] + lines
+    if character.draft:
+        lines.append(f"\n  ※ {character.name} 어휘는 초안이에요. 원작 표현과 다를 수 있어요.")
+    return "\n".join(lines)
 
 
-def format_dict() -> str:
-    width = max(_display_width(w) for w in VOCAB) + 2
-    return "\n".join(
-        f"  {e.word}{' ' * (width - _display_width(e.word))}{e.situation}" for e in VOCAB.values()
-    )
+def banner(character: Character, show_art: bool = True) -> str:
+    """시작 화면. 아트가 없거나 터미널이 아트보다 좁으면 작은 배너로 대신한다."""
+    if show_art and character.art and shutil.get_terminal_size().columns >= character.art_width:
+        return f"{character.art}\n\n   {character.title}\n"
+    return character.small_banner.format(title=character.title)
 
 
-def banner(show_art: bool = True) -> str:
-    """시작 화면. 터미널이 아트보다 좁으면 작은 배너로 대신한다."""
-    if show_art and shutil.get_terminal_size().columns >= ART_WIDTH:
-        return f"{USAGI_ART}\n   {TITLE}\n"
-    return SMALL_BANNER
+def chat(chatter: Chatter, explain: bool, show_art: bool = True) -> int:
+    def say(text: str) -> None:
+        print(f"{chatter.character.name}> {text}")
 
-
-def chat(usagi: Usagi, explain: bool, show_art: bool = True) -> int:
-    print(banner(show_art))
-    print(f"우사기> {usagi.greet().render(explain)}")
+    print(banner(chatter.character, show_art))
+    say(chatter.greet().render(explain))
     while True:
         try:
             message = input("나> ").strip()
         except (EOFError, KeyboardInterrupt):
-            print(f"\n우사기> {VOCAB['푸루'].word}!")
+            print()
+            say(chatter.farewell().text)
             return 0
         if not message:
             continue
-        if message in ("/quit", "/exit", "/q"):
-            print(f"우사기> {VOCAB['푸루'].word}!")
+        command, _, arg = message.partition(" ")
+        if command in ("/quit", "/exit", "/q"):
+            say(chatter.farewell().text)
             return 0
-        if message == "/help":
+        if command == "/help":
             print(HELP)
-            continue
-        if message == "/dict":
-            print(format_dict())
-            continue
-        if message == "/explain":
+        elif command == "/dict":
+            print(format_dict(chatter.character))
+        elif command == "/explain":
             explain = not explain
             print(f"(번역 표시 {'ON' if explain else 'OFF'})")
-            continue
-        print(f"우사기> {usagi.reply(message).render(explain)}")
+        elif command == "/char":
+            key = arg.strip()
+            if key not in CHARACTERS:
+                print(f"(가능한 캐릭터: {', '.join(CHARACTERS)})")
+                continue
+            chatter = Chatter(CHARACTERS[key])
+            print(banner(chatter.character, show_art))
+            say(chatter.greet().render(explain))
+        else:
+            say(chatter.reply(message).render(explain))
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="usagi", description="치이카와 우사기와 터미널에서 대화하기")
+def build_parser(prog: str, default_character: str) -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog=prog, description="치이카와 캐릭터와 터미널에서 대화하기")
     parser.add_argument("-V", "--version", action="version", version=f"%(prog)s {__version__}")
+    parser.add_argument(
+        "-c",
+        "--char",
+        choices=list(CHARACTERS),
+        default=default_character,
+        help=f"대화할 캐릭터 (기본: {default_character})",
+    )
     parser.add_argument("-e", "--explain", action="store_true", help="대답 옆에 번역 표시")
     parser.add_argument("--seed", type=int, help="랜덤 시드 (재현용)")
-    parser.add_argument("--no-art", action="store_true", help="시작할 때 우사기 아트 숨기기")
+    parser.add_argument("--no-art", action="store_true", help="시작할 때 아트 숨기기")
     sub = parser.add_subparsers(dest="command")
     say_p = sub.add_parser("say", help="한 문장에 대한 대답만 출력")
     say_p.add_argument("message", nargs="+")
-    tr_p = sub.add_parser("translate", help="우사기 말을 번역")
+    tr_p = sub.add_parser("translate", help="캐릭터 말을 번역")
     tr_p.add_argument("word")
-    sub.add_parser("dict", help="우사기 사전 출력")
-    sub.add_parser("art", help="우사기 아트 출력")
+    sub.add_parser("dict", help="캐릭터 사전 출력")
+    sub.add_parser("art", help="캐릭터 아트 출력")
     return parser
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
-    usagi = Usagi(seed=args.seed)
+def main(argv: list[str] | None = None, character: str = "usagi") -> int:
+    args = build_parser(character, character).parse_args(argv)
+    chatter = Chatter(get_character(args.char), seed=args.seed)
+    selected = chatter.character
     if args.command == "say":
-        print(usagi.reply(" ".join(args.message)).render(args.explain))
+        print(chatter.reply(" ".join(args.message)).render(args.explain))
         return 0
     if args.command == "translate":
-        print(translate(args.word))
+        print(selected.translate(args.word))
         return 0
     if args.command == "dict":
-        print(format_dict())
+        print(format_dict(selected))
         return 0
     if args.command == "art":
-        print(USAGI_ART)
+        print(selected.art or selected.small_banner.format(title=selected.name))
         return 0
     if not sys.stdin.isatty():
         for line in sys.stdin:
             if line.strip():
-                print(usagi.reply(line.strip()).render(args.explain))
+                print(chatter.reply(line.strip()).render(args.explain))
         return 0
-    return chat(usagi, args.explain, show_art=not args.no_art)
+    return chat(chatter, args.explain, show_art=not args.no_art)
+
+
+def chii_main(argv: list[str] | None = None) -> int:
+    return main(argv, character="chii")
+
+
+def hachi_main(argv: list[str] | None = None) -> int:
+    return main(argv, character="hachi")
